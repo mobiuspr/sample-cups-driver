@@ -1,0 +1,46 @@
+#!/usr/bin/env node
+const fs = require('fs');
+// const { PrintServer } = require('/usr/lib/node_modules/mobius');
+const { PrintServer, findServers } = require('/usr/lib/Mobius');
+if(process.argv.length === 2) {
+    console.log('network mobius "Unknown" "Mobility Print (mobius)"');
+    findServers().then(async servers => {
+        // let i = 0;
+        for(const server of servers) {
+            const printers = (await server.getPrinters(true)).filter(e=>e.authMode === 'per-printer');
+            for(const printer of printers) {
+                console.log(`network ${'mobius://' + printer.name + '-' + server.host + '.mbp/?port=' + server.port + '&server='+ server.host + '&printer=' + printer.name } ${JSON.stringify(`${printer.name}`)} ${JSON.stringify(`${printer.name} [${printer.description}]`)} ${JSON.stringify(`MFG:Generic;MDL:PDF Printer;CMD:PDF;`)} ""`)
+                // i++;
+                // await new Promise(e=>setTimeout(()=>e(),500));
+            }
+        }
+    });
+} else if(process.argv[2] === '-h' || process.argv[2] === '--help') {
+    console.log("Usage: ./mobius job-id user title copies options [file]");
+} else {
+    console.log("STATE: connected-to-device");
+    const url = new URL(process.env.DEVICE_URI);
+    if(!url.protocol.startsWith('mobius:')) process.exit(1);
+    const server = new PrintServer(url.searchParams.get('server'), Number(url.port||"9163")||9163);
+    let chunks = [];
+
+    process.stdin.on('data', (chunk) => {
+        chunks.push(chunk);
+    });
+
+    process.stdin.on('end', async () => {
+        let uuu = url.searchParams.get('username') || 'SERVER_USERNAME';
+        let ppp = url.searchParams.get('password') || 'SERVER_PASSWORD';
+        server.print(url.searchParams.get("printer") || process.env.PRINTER, new Blob([
+            Buffer.concat(chunks)
+        ], {type: 'application/pdf'}), {
+            copies: 1,
+            name: "Print Job",
+            duplex: 'none',
+            size: 'NA_LETTER',
+            username: uuu,
+            password: ppp,
+            color: true
+        }).then(() => process.exit(0)).catch(() => process.exit(1));
+    });
+}
